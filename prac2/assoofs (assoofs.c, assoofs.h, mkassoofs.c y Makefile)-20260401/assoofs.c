@@ -89,6 +89,10 @@ struct dentry *assoofs_lookup(struct inode *parent_inode, struct dentry *child_d
     struct super_block *sb = parent_inode->i_sb;
     struct buffer_head *bh = sb_bread(sb, dir_padre->data_block_number);
 
+    struct assoofs_dir_record_entry *record = (struct assoofs_dir_record_entry *) bh->b_data;
+
+    
+
     return NULL;
 }
 
