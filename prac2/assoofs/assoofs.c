@@ -134,6 +134,8 @@ ssize_t assoofs_write(struct file *filp, const char __user *buf, size_t len, lof
  */
 
 static int assoofs_iterate(struct file *filp, struct dir_context *ctx) {
+    printk(KERN_INFO "assoofs_iterate request\n");
+
     struct inode *inode = filp->f_inode;
     struct assoofs_inode_info *inode_info = inode->i_private;
     struct super_block *sb = inode->i_sb;
@@ -141,18 +143,17 @@ static int assoofs_iterate(struct file *filp, struct dir_context *ctx) {
     struct assoofs_dir_record_entry *record;
     int i;
 
-    printk(KERN_INFO "assoofs_iterate request\n");
-
     if (ctx->pos >= inode_info->dir_children_count)
         return 0;
 
     bh = sb_bread(sb, inode_info->data_block_number);
     record = (struct assoofs_dir_record_entry *)bh->b_data;
-    record += ctx->pos;
 
-    for (i = ctx->pos; i < inode_info->dir_children_count; i++) {
-        dir_emit(ctx, record->filename, strlen(record->filename), record->inode_no, DT_UNKNOWN);
-        ctx->pos++;
+    for (i = 0; i < inode_info->dir_children_count; i++) {
+        if (record->entry_removed == ASSOOFS_FALSE) {
+            dir_emit(ctx, record->filename, strlen(record->filename), record->inode_no, DT_UNKNOWN);
+            ctx->pos++;
+        }
         record++;
     }
 
@@ -303,8 +304,7 @@ static int assoofs_remove(struct inode *dir, struct dentry *dentry) {
     struct assoofs_inode_info *parent_inode_info = dir->i_private;
     struct buffer_head *bh;
     struct assoofs_dir_record_entry *record;
-    struct assoofs_dir_record_entry *next;
-    int i, found = -1;
+    int i;
 
     printk(KERN_INFO "assoofs_remove request\n");
 
@@ -313,29 +313,15 @@ static int assoofs_remove(struct inode *dir, struct dentry *dentry) {
 
     for (i = 0; i < parent_inode_info->dir_children_count; i++) {
         if (record->inode_no == inode_info->inode_no) {
-            found = i;
+            record->entry_removed = ASSOOFS_TRUE;
             break;
         }
         record++;
     }
 
-    if (found >= 0) {
-        record = (struct assoofs_dir_record_entry *)bh->b_data + found;
-        next = record + 1;
-        for (i = found; i < parent_inode_info->dir_children_count - 1; i++) {
-            memcpy(record, next, sizeof(struct assoofs_dir_record_entry));
-            record++;
-            next++;
-        }
-        memset(record, 0, sizeof(struct assoofs_dir_record_entry));
-    }
-
     mark_buffer_dirty(bh);
     sync_dirty_buffer(bh);
     brelse(bh);
-
-    parent_inode_info->dir_children_count--;
-    assoofs_save_inode_info(sb, parent_inode_info);
 
     assoofs_sb_set_a_freeinode(sb, inode->i_ino);
     assoofs_sb_set_a_freeblock(sb, inode_info->data_block_number);
