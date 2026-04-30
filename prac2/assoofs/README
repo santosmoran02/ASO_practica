@@ -1,0 +1,11 @@
+Nombre: Santos
+
+Apellidos: Morán Blanco
+
+DNI: 49678705Q
+
+Partes avanzadas implementadas:
+
+- Caché de inodos
+- Semáforos
+- Mover ficheros con mv
