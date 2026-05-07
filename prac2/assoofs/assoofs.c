@@ -39,7 +39,7 @@ struct assoofs_inode_info *assoofs_search_inode_info(struct super_block *sb, str
 int assoofs_sb_set_a_freeinode(struct super_block *sb, unsigned long inode_no);
 int assoofs_sb_set_a_freeblock(struct super_block *sb, uint64_t block_no);
 
-/* Caché de inodos: función para destruir inodos (Anexo B) */
+
 static void assoofs_destroy_inode(struct inode *inode) {
     struct assoofs_inode_info *inode_info = inode->i_private;
     printk(KERN_INFO "Freeing private data of inode %p (%lu)\n", inode_info, inode->i_ino);
@@ -76,7 +76,6 @@ static struct inode_operations assoofs_inode_ops = {
     .rename = assoofs_move,
 };
 
-/* Usando nuestra propia función de destrucción de inodos para la caché (Anexo B) */
 static const struct super_operations assoofs_sops = {
     .destroy_inode = assoofs_destroy_inode,
 };
@@ -243,7 +242,6 @@ static int assoofs_create(struct mnt_idmap *idmap, struct inode *dir, struct den
     inode->i_op = &assoofs_inode_ops;
     assoofs_sb_get_a_freeinode(sb, &inode->i_ino);
 
-    /* Caché de inodos: usar kmem_cache_alloc en lugar de kmalloc (Anexo B) */
     inode_info = kmem_cache_alloc(assoofs_inode_cache, GFP_KERNEL);
     inode_info->inode_no = inode->i_ino;
     inode_info->mode = mode;
@@ -295,7 +293,6 @@ struct dentry *assoofs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct 
     inode->i_op = &assoofs_inode_ops;
     assoofs_sb_get_a_freeinode(sb, &inode->i_ino);
 
-    /* Caché de inodos: usar kmem_cache_alloc en lugar de kmalloc (Anexo B) */
     inode_info = kmem_cache_alloc(assoofs_inode_cache, GFP_KERNEL);
     inode_info->inode_no = inode->i_ino;
     inode_info->mode = S_IFDIR | mode;
@@ -359,7 +356,6 @@ static int assoofs_remove(struct inode *dir, struct dentry *dentry) {
     return 0;
 }
 
-/* Mover archivos (Anexo D) */
 static int assoofs_move(struct mnt_idmap *idmap, struct inode *old_dir, struct dentry *old_dentry,
                         struct inode *new_dir, struct dentry *new_dentry, unsigned int flags) {
     printk(KERN_INFO "assoofs_move request\n");
@@ -373,7 +369,6 @@ static int assoofs_move(struct mnt_idmap *idmap, struct inode *old_dir, struct d
     struct assoofs_dir_record_entry *record;
     int i;
 
-    /* Actualizar el nombre en el directorio origen */
     bh = sb_bread(sb, old_parent_info->data_block_number);
     record = (struct assoofs_dir_record_entry *)bh->b_data;
 
@@ -392,7 +387,6 @@ static int assoofs_move(struct mnt_idmap *idmap, struct inode *old_dir, struct d
     old_parent_info->dir_children_count--;
     assoofs_save_inode_info(sb, old_parent_info);
 
-    /* Añadir entrada en el directorio destino */
     bh = sb_bread(sb, new_parent_info->data_block_number);
     record = (struct assoofs_dir_record_entry *)bh->b_data;
     record += new_parent_info->dir_children_count;
@@ -482,7 +476,6 @@ struct assoofs_inode_info *assoofs_get_inode_info(struct super_block *sb, uint64
     afs_sb = sb->s_fs_info;
     for (i = 0; i < afs_sb->inodes_count; i++) {
         if (inode_info->inode_no == inode_no) {
-            /* Caché de inodos: usar kmem_cache_alloc en lugar de kmalloc (Anexo B) */
             buffer = kmem_cache_alloc(assoofs_inode_cache, GFP_KERNEL);
             memcpy(buffer, inode_info, sizeof(*buffer));
             break;
@@ -544,7 +537,6 @@ int assoofs_sb_get_a_freeblock(struct super_block *sb, uint64_t *block) {
     struct assoofs_super_block_info *assoofs_sb;
     int i;
 
-    /* Semáforo: proteger acceso al superbloque (Anexo C) */
     mutex_lock_interruptible(&assoofs_sb_lock);
 
     assoofs_sb = sb->s_fs_info;
@@ -576,7 +568,6 @@ void assoofs_add_inode_info(struct super_block *sb, struct assoofs_inode_info *i
     struct buffer_head *bh;
     struct assoofs_inode_info *inode_info;
 
-    /* Semáforo: proteger acceso al almacén de inodos (Anexo C) */
     mutex_lock_interruptible(&assoofs_inodestore_lock);
 
     assoofs_sb = sb->s_fs_info;
@@ -618,7 +609,6 @@ int assoofs_save_inode_info(struct super_block *sb, struct assoofs_inode_info *i
     struct buffer_head *bh;
     struct assoofs_inode_info *inode_pos;
 
-    /* Semáforo: proteger acceso al almacén de inodos (Anexo C) */
     mutex_lock_interruptible(&assoofs_inodestore_lock);
 
     bh = sb_bread(sb, ASSOOFS_INODESTORE_BLOCK_NUMBER);
@@ -697,7 +687,6 @@ static int __init assoofs_init(void) {
     int ret;
     printk(KERN_INFO "assoofs_init request\n");
 
-    /* Caché de inodos: inicializar la caché (Anexo B) */
     assoofs_inode_cache = kmem_cache_create("assoofs_inode_cache",
         sizeof(struct assoofs_inode_info), 0,
         (SLAB_RECLAIM_ACCOUNT), NULL);
@@ -714,7 +703,6 @@ static void __exit assoofs_exit(void) {
 
     ret = unregister_filesystem(&assoofs_type);
 
-    /* Caché de inodos: destruir la caché (Anexo B) */
     kmem_cache_destroy(assoofs_inode_cache);
 }
 
